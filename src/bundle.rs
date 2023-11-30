@@ -5,6 +5,7 @@ use ethers::core::{
     utils::keccak256,
 };
 use serde::{Deserialize, Serialize, Serializer};
+use uuid::Uuid;
 
 /// A bundle hash.
 pub type BundleHash = H256;
@@ -65,6 +66,11 @@ pub struct BundleRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     max_timestamp: Option<u64>,
 
+    #[serde(rename = "replacementUuid")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(serialize_with = "serialize_uuid_as_string")]
+    uuid: Option<Uuid>,
+
     #[serde(rename = "stateBlockNumber")]
     #[serde(skip_serializing_if = "Option::is_none")]
     simulation_block: Option<U64>,
@@ -76,6 +82,15 @@ pub struct BundleRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "baseFee")]
     simulation_basefee: Option<u64>,
+}
+
+fn serialize_uuid_as_string<S>(x: &Option<Uuid>, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    // Don't need to handle None option here as handled by
+    // #[serde(skip_serializing_if = "Option::is_none")]
+    s.serialize_str(&x.unwrap().to_string())
 }
 
 pub fn serialize_txs<S>(txs: &[BundleTransaction], s: S) -> Result<S::Ok, S::Error>
@@ -168,6 +183,18 @@ impl BundleRequest {
                 BundleTransaction::Raw(inner) => keccak256(inner).into(),
             })
             .collect()
+    }
+
+    /// Get a reference to the replacement uuid (if any).
+    pub fn uuid(&self) -> &Option<Uuid> {
+        &self.uuid
+    }
+
+    /// Set the replacement uuid of the bundle.
+    /// This is used for bundle replacements or cancellations using eth_cancelBundle
+    pub fn set_uuid(mut self, uuid: Uuid) -> Self {
+        self.uuid = Some(uuid);
+        self
     }
 
     /// Get the target block (if any).
